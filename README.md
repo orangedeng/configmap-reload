@@ -17,6 +17,8 @@ It is available as a Docker image at https://hub.docker.com/r/jimmidyson/configm
 
 ```
 Usage of ./out/configmap-reload:
+  -header value
+        the http headers for the request to webhook-url
   -volume-dir value
         the config map volume directory to watch for updates; may be used multiple times
   -web.listen-address string

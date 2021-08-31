@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	fsnotify "github.com/fsnotify/fsnotify"
@@ -26,6 +27,8 @@ var (
 	webhookRetries    = flag.Int("webhook-retries", 1, "the amount of times to retry the webhook reload request")
 	listenAddress     = flag.String("web.listen-address", ":9533", "Address to listen on for web interface and telemetry.")
 	metricPath        = flag.String("web.telemetry-path", "/metrics", "Path under which to expose metrics.")
+
+	headers customHeadersFlag = customHeadersFlag(http.Header{})
 
 	lastReloadError = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: namespace,
@@ -71,6 +74,7 @@ func init() {
 func main() {
 	flag.Var(&volumeDirs, "volume-dir", "the config map volume directory to watch for updates; may be used multiple times")
 	flag.Var(&webhook, "webhook-url", "the url to send a request to when the specified config map volume directory has been updated")
+	flag.Var(&headers, "header", "the http headers for the request to webhook-url")
 	flag.Parse()
 
 	if len(volumeDirs) < 1 {
@@ -113,6 +117,12 @@ func main() {
 					if userInfo != nil {
 						if password, passwordSet := userInfo.Password(); passwordSet {
 							req.SetBasicAuth(userInfo.Username(), password)
+						}
+					}
+
+					for k, v := range headers {
+						for _, vv := range v {
+							req.Header.Add(k, vv)
 						}
 					}
 
@@ -226,4 +236,24 @@ func (v *webhookFlag) Set(value string) error {
 
 func (v *webhookFlag) String() string {
 	return fmt.Sprint(*v)
+}
+
+type customHeadersFlag http.Header
+
+func (h *customHeadersFlag) Set(value string) error {
+	pairs := strings.SplitN(value, "=", 2)
+	if len(pairs) < 2 {
+		return fmt.Errorf("invalid header format %s, should be k=v", value)
+	}
+	header := http.Header(*h)
+	header.Add(pairs[0], pairs[1])
+	return nil
+}
+
+func (h *customHeadersFlag) String() string {
+	var line []string
+	for k, v := range *h {
+		line = append(line, fmt.Sprintf("%s=%v", k, v))
+	}
+	return strings.Join(line, ",")
 }
